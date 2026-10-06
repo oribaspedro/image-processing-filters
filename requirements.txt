@@ -1,0 +1,7 @@
+numpy
+ultralytics
+cvzone
+opencv-contrib-python
+Pillow
+pygame
+matplotlib
