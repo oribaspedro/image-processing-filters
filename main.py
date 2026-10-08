@@ -6,7 +6,7 @@ import cv2
 import tkinter as tk
 from tkinter import filedialog
 from PIL import Image, ImageTk
-from yolo_cfg import model
+from yolo_cfg import model, model_seg, model_pose
 from copy import deepcopy
 import pygame
 import matplotlib
@@ -27,6 +27,8 @@ MAX_DISPLAY_HEIGHT = 500
 class AppFilters:
     def __init__(self, gui):
         self.yolo = model
+        self.yolo_seg = model_seg
+        self.yolo_pose = model_pose
         self.yolo_every = 5
         self.yolo_count = 0
         self.yolo_detections = []
@@ -155,6 +157,10 @@ class AppFilters:
 
         self.add_row(12, "Rastreamento\nde objeto", "tracking")
 
+        self.add_row(13, "Segmentacao\nde objetos", "yolo_seg")
+
+        self.add_row(14, "Deteccao\nde poses", "yolo_pose")
+
     def create_buttons_image(self):
         self.add_row(0, "Sem filtro", None)
         self.add_row(1, "Niveis de cinza", "gray")
@@ -221,6 +227,7 @@ class AppFilters:
         if mode == "image":
             self.create_buttons_image()
             self.select_image()
+            self.set_filter(None)
             
         elif mode == "camera":
             self.create_buttons_camera()
@@ -425,6 +432,16 @@ class AppFilters:
             frame = cv2.dilate(frame, kernel, iterations=1)
             frame = cv2.erode(frame, kernel, iterations=1)
             return frame
+
+        if f == "yolo_seg":
+            results = model_seg(frame, verbose=False)
+            annotaded_frame = results[0].plot()
+            return annotaded_frame
+
+        if f == "yolo_pose":
+            results = model_pose(frame, verbose=False)
+            annotaded_frame = results[0].plot()
+            return annotaded_frame
 
     def apply_filter_image(self, image):
         f = self.current_filter
