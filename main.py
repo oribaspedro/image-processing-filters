@@ -59,8 +59,10 @@ class AppFilters:
 
         self.canny_t1 = tk.StringVar(value="50")
         self.canny_t2 = tk.StringVar(value="150")
-        self.median_kernel = tk.StringVar(value="5")
-        self.mean_kernel = tk.StringVar(value="5")
+        self.median_kernel = tk.StringVar(value="3")
+        self.median_iterations = tk.StringVar(value="1")
+        self.mean_kernel = tk.StringVar(value="3")
+        self.mean_iterations = tk.StringVar(value="1")
         self.erode_iterations = tk.StringVar(value="1")
         self.dilate_iterations = tk.StringVar(value="1")
         self.erode_kernel_rows = tk.StringVar(value="3")
@@ -131,9 +133,11 @@ class AppFilters:
 
         params = self.add_row(5, "Suavização\nmediana", "median")
         self.add_param(params, "tam. kernel:", self.median_kernel)
+        self.add_param(params, "iteracoes:", self.median_iterations)
 
         params = self.add_row(6, "Suavização\nmedia", "mean")
         self.add_param(params, "tam. kernel:", self.mean_kernel)
+        self.add_param(params, "iteracoes:", self.mean_iterations)
 
         params = self.add_row(7, "Deteccao de\nobjetos", "yolo")
 
@@ -169,9 +173,11 @@ class AppFilters:
 
         params = self.add_row(4, "Suavização\nmediana", "median")
         self.add_param(params, "tam. kernel:", self.median_kernel)
+        self.add_param(params, "iteracoes:", self.median_iterations)
 
         params = self.add_row(5, "Suavização\nmedia", "mean")
         self.add_param(params, "tam. kernel:", self.mean_kernel)
+        self.add_param(params, "iteracoes:", self.mean_iterations)
 
         params = self.add_row(6, "Canny", "canny")
         self.add_param(params, "threshold 1:", self.canny_t1)
@@ -200,6 +206,8 @@ class AppFilters:
         self.add_row(12, "Componentes\nconexos", "components")
 
         self.add_row(13, "Medidas\nobjetos", "measurements")
+
+        self.add_row(14, "Sobel", "sobel")
 
     def set_filter(self, filter_name):
         self.current_filter = filter_name
@@ -346,12 +354,18 @@ class AppFilters:
             return cv2.Canny(gray_image, t1, t2)
 
         if f == "median":
+            iterations = self.read_int(self.median_iterations, 1)
             k = self.odd_kernel(self.median_kernel)
-            return cv2.medianBlur(frame, k)
+            for i in range(iterations):
+                frame = cv2.medianBlur(frame, k)
+            return frame
 
         if f == "mean":
+            iterations = self.read_int(self.mean_iterations, 1)
             k = self.odd_kernel(self.mean_kernel)
-            return cv2.blur(frame, (k, k))
+            for i in range(iterations):
+                frame = cv2.blur(frame, (k, k))
+            return frame
 
         if f == "yolo":
             if self.yolo_count % self.yolo_every == 0:
@@ -490,41 +504,48 @@ class AppFilters:
             return cv2.Canny(gray_image, t1, t2)
 
         if f == "median":
+            iterations = self.read_int(self.median_iterations, 1)
             tam_janela = self.odd_kernel(self.median_kernel)
             altura, largura = image.shape[:2]
             margem = tam_janela // 2
 
-            image_padded = np.pad(image, ((margem, margem), (margem, margem), (0, 0)), mode="reflect")
-            img_transformada = np.zeros_like(image)
-        
-            for i in range(altura):
-                for j in range(largura):
-                    vizinhanca = image_padded[i : i + tam_janela, j : j + tam_janela]
-        
-                    for canal in range(3):
-                        img_transformada[i, j, canal] = np.median(vizinhanca[:, :, canal])
-        
-            img_transformada = img_transformada.astype(np.uint8)
-            return img_transformada
+            for i in range(iterations):
+                image_padded = np.pad(image, ((margem, margem), (margem, margem), (0, 0)), mode="reflect")
+
+                img_transformada = np.zeros_like(image)
+            
+                for i in range(altura):
+                    for j in range(largura):
+                        vizinhanca = image_padded[i : i + tam_janela, j : j + tam_janela]
+            
+                        for canal in range(3):
+                            img_transformada[i, j, canal] = np.median(vizinhanca[:, :, canal])
+            
+                img_transformada = img_transformada.astype(np.uint8)
+                image = img_transformada
+            return image
 
         if f == "mean":
+            iterations = self.read_int(self.mean_iterations, 1)
             tam_janela = self.odd_kernel(self.mean_kernel)
             margem = tam_janela // 2
             altura, largura = image.shape[:2]
 
-            image_padded = np.pad(image, ((margem, margem), (margem, margem), (0, 0)), mode="reflect")
+            for i in range(iterations):
+                image_padded = np.pad(image, ((margem, margem), (margem, margem), (0, 0)), mode="reflect")
 
-            img_transformada = np.zeros_like(image)
-        
-            for i in range(altura):
-                for j in range(largura):
-                    vizinhanca = image_padded[i : i + tam_janela, j : j + tam_janela]
+                img_transformada = np.zeros_like(image)
+            
+                for i in range(altura):
+                    for j in range(largura):
+                        vizinhanca = image_padded[i : i + tam_janela, j : j + tam_janela]
 
-                    for canal in range(3):
-                        img_transformada[i, j, canal] = np.mean(vizinhanca[:, :, canal])
-        
-            img_transformada = img_transformada.astype(np.uint8)
-            return img_transformada
+                        for canal in range(3):
+                            img_transformada[i, j, canal] = np.mean(vizinhanca[:, :, canal])
+            
+                img_transformada = img_transformada.astype(np.uint8)
+                image = img_transformada
+            return image
 
         if f == "erode":
             kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (self.read_int(self.erode_kernel_rows, 3), self.read_int(self.erode_kernel_cols, 3)))
@@ -708,6 +729,27 @@ class AppFilters:
                 canvas.bind("<Configure>", resize_frame)
                 
                 return image
+
+        if f == "sobel":
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+            h1 = np.array([[-1,-2,-1],[0,0,0],[1,2,1]], dtype=np.float64)
+            h2 = np.array([[-1,0,1],[-2,0,2],[-1,0,1]], dtype=np.float64)
+        
+            img_transformada = np.zeros_like(image, dtype=np.float64)
+            altura, largura = image.shape
+            margem = 1
+        
+            for i in range(margem, altura - margem):
+                for j in range(margem, largura - margem):
+                    vizinhanca = image[i - margem : i + margem + 1 , j - margem : j + margem + 1 ]
+                    img_transformada[i, j] = (np.sum(vizinhanca * h1) ** 2 + np.sum(vizinhanca * h2) ** 2) ** (1/2)
+        
+            img_transformada = np.clip(
+                np.abs(img_transformada),
+                0,
+                255
+            ).astype(np.uint8)
+            return img_transformada
 
 
     def start_selection(self, event):
